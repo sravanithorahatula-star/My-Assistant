@@ -315,9 +315,6 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="https://apis.google.com/js/api.js"></script>
-<script src="https://accounts.google.com/gsi/client"></script>
-
 <script>
 // ═══════════════════════════════════════════════
 // CONFIG
@@ -1069,30 +1066,49 @@ function toast(msg){
 // ═══════════════════════════════════════════════
 // BOOT
 // ═══════════════════════════════════════════════
-window.onload=()=>{
-  // Load from Sheets first, fall back to localStorage
-  const cached=localStorage.getItem('mya_tasks');
-  if(cached){tasks=JSON.parse(cached);}
-  const cachedR=localStorage.getItem('mya_reminders');
-  if(cachedR){reminders=JSON.parse(cachedR);}
-  if(!tasks.length)seedTasks();
+function loadGoogleScripts() {
+  // Load GAPI
+  const s1 = document.createElement('script');
+  s1.src = 'https://apis.google.com/js/api.js';
+  s1.onload = () => {
+    // Load GSI after GAPI is ready
+    const s2 = document.createElement('script');
+    s2.src = 'https://accounts.google.com/gsi/client';
+    s2.onload = () => { initGapi(); };
+    s2.onerror = () => { console.log('GSI failed to load'); };
+    document.head.appendChild(s2);
+  };
+  s1.onerror = () => { console.log('GAPI failed to load'); };
+  document.head.appendChild(s1);
+}
 
+document.addEventListener('DOMContentLoaded', () => {
+  // Load from localStorage immediately so page shows data right away
+  try {
+    const cached = localStorage.getItem('mya_tasks');
+    if (cached) tasks = JSON.parse(cached);
+    const cachedR = localStorage.getItem('mya_reminders');
+    if (cachedR) reminders = JSON.parse(cachedR);
+  } catch(e) {}
+  if (!tasks.length) seedTasks();
+
+  // Render immediately — don't wait for any external scripts
   renderAll();
   checkNotifPermission();
   scheduleAllReminders();
 
-  // Load fresh from Sheets in background
-  loadFromSheets();
+  // Load Google APIs in background after page is visible
+  setTimeout(loadGoogleScripts, 500);
+
+  // Load fresh data from Sheets in background
+  setTimeout(loadFromSheets, 1000);
 
   // Auto-sync every 5 minutes
-  setInterval(loadFromSheets, 5*60*1000);
+  setInterval(loadFromSheets, 5 * 60 * 1000);
 
-  // Time indicator refresh
-  setInterval(()=>{renderSchedule();scheduleAllReminders();},60000);
-
-  // Google APIs
-  if(typeof gapi!=='undefined')initGapi();
-};
+  // Time indicator refresh every minute
+  setInterval(() => { renderSchedule(); scheduleAllReminders(); }, 60000);
+});
 </script>
 </body>
 </html>
